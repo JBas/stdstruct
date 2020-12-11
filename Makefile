@@ -8,7 +8,7 @@ SRC = src
 TEST = tests
 
 $(HASH):
-	$(CC) $(CFLAGS) -o $(HASH) $(INCLUDES) $(SRC)/$(HASH).c $(TEST)/$(HASH)_test.c
+	$(CC) $(CFLAGS) -o $(TEST)/$(HASH).out $(INCLUDES) $(SRC)/$(HASH).c $(TEST)/$(HASH)_test.c
 
 $(LLIST):
-	$(CC) $(CFLAGS) -o $(LLIST) $(INCLUDES) $(SRC)/$(LLIST).c $(TEST)/$(LLIST)_test.c
+	$(CC) $(CFLAGS) -o $(TEST)/$(LLIST).out $(INCLUDES) $(SRC)/$(LLIST).c $(TEST)/$(LLIST)_test.c
