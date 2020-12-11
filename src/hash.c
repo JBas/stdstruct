@@ -14,88 +14,15 @@
 #include "llist.h"
 #include "debug.h"
 
+typedef struct lib_hash lhash;
 struct lib_hash {
-    int size;
-    int capacity;
+    size_t size;
+    size_t capacity;
     linked_list_t* table;
     key_equiv_fn_t equiv_fn;
     key_hash_fn_t hash_fn;
     item_print_fn_t print_fn;
 };
-typedef struct lib_hash lhash;
-
-/*---------------------------------------------------------------------------*/
-
-/**
- * @brief chain constructor function.
- * @param k
- * @param v
- * @return chain, a dynamically allocated lchain pointer
- */
-lchain *chain_new(key_t k, val_t v) {
-    lchain *chain = (lchain *)malloc(sizeof(lchain));
-    chain->k = k;
-    chain->v = v;
-    chain->prev = NULL;
-    chain->next = NULL;
-
-    dbg_assert(chain != NULL);
-    return chain;
-}
-
-/**
- * @brief chain insertion function.
- * @param base
- * @param chain
- * @return void
- */
-void chain_insert(lchain *base, lchain *chain) {
-    dbg_assert(base != NULL);
-    dbg_assert(base->prev == NULL);
-    dbg_assert(chain != NULL);
-
-    base->prev = chain;
-    chain->next = base;
-    chain->prev = NULL;
-    return;
-}
-
-/**
- * @brief chain pop function.
- * @param chain
- * @return chain
- */
-lchain *chain_pop(lchain *chain) {
-    dbg_assert(chain != NULL);
-
-    if (chain->prev != NULL) {
-        lchain *prev = chain->prev;
-        lchain *next = chain->next;
-        prev->next = next;
-    }
-
-    if (chain->next != NULL) {
-        lchain *prev = chain->prev;
-        lchain *next = chain->next;
-        next->prev = prev;
-    }
-
-    return chain;
-}
-
-/**
- * @brief chain free function.
- * @param chain
- * @return void
- */
-void chain_free(lchain *chain) {
-    // does not free any of chain members,
-    // because they can still be referenced
-    // by other chains!
-    dbg_assert(chain != NULL);
-
-    free(chain);
-}
 
 /*---------------------------------------------------------------------------*/
 
@@ -107,17 +34,16 @@ void chain_free(lchain *chain) {
  * @param print_fn
  * @return hash
  */
-lhash *hash_new(int capacity,
-                key_equiv_fn_t equiv_fn,
-                key_hash_fn_t hash_fn,
-                item_print_fn_t print_fn) {
-    dbg_assert(capacity > 0);
+lhash* hash_create(size_t capacity,
+                   key_equiv_fn_t equiv_fn,
+                   key_hash_fn_t hash_fn,
+                   item_print_fn_t print_fn) {
     dbg_assert(equiv_fn != NULL);
     dbg_assert(hash_fn != NULL);
     dbg_assert(print_fn != NULL);
 
     lhash *hash = (lhash *)malloc(sizeof(lhash));
-    lchain **table = (lchain **)malloc(capacity*sizeof(lchain *));
+    linked_list_t* table = (linked_list_t*)malloc(capacity*sizeof(linked_list_t));
 
     hash->size = 0;
     hash->capacity = capacity;
@@ -135,6 +61,8 @@ lhash *hash_new(int capacity,
     return hash;
 }
 
+void print_pass(data_t data) { return; }
+
 /**
  * @brief hash table insertion function.
  * @param hash
@@ -145,18 +73,22 @@ lhash *hash_new(int capacity,
 void hash_insert(lhash *hash, key_t k, val_t v) {
     dbg_assert(hash != NULL);
 
-    lchain *chain = chain_new(k, v);
+    data_t* kv_pair = (data_t*)malloc(2*sizeof(data_t));
+    dbg_assert(kv_pair != NULL);
+
+    kv_pair[0] = (data_t)k;
+    kv_pair[1] = (data_t)v;
     hash->size++;
 
-    int index = hash->hash_fn(chain->k) % hash->capacity;
+    int index = hash->hash_fn(k) % hash->capacity;
 
     if (hash->table[index] == NULL) {
-        hash->table[index] = chain;
+        hash->table[index] = list_create((data_t)kv_pair, &print_pass);
         return;
     }
 
-    chain_insert(hash->table[index], chain);
-    hash->table[index] = chain;
+    list_append(hash->table[index], (data_t)kv_pair);
+    return;
 }
 
 /**
@@ -170,25 +102,27 @@ val_t hash_remove(hash_t hash, key_t k) {
 
     int index = hash->hash_fn(k) % hash->capacity;
 
-    lchain *temp = hash->table[index];
-    while (temp != NULL) {
-        if (hash->equiv_fn(temp->k, k)) {
-            val_t v = temp->v;
-            chain_pop(temp);
+    linked_list_t list = hash->table[index];
+    dbg_assert(list != NULL);
 
-            if (hash->table[index] == temp) {
-                hash->table[index] = temp->next;
-            }
+    size_t len = list_getlen(list);
 
-            temp->prev = NULL;
-            temp->next = NULL;
+    for (size_t i = 0; i < len; i++) {
+        data_t data = list_pop(list);
 
-            chain_free(temp);
-            return v;
+        data_t* kv_pair = (data_t*)data;
+        key_t _k = (key_t)(kv_pair[0]);
+        val_t _v = (val_t)(kv_pair[1]);
+
+        if (hash->equiv_fn(_k, k)) {
+            free(kv_pair);
+            hash->size--;
+            return _v;
+        } else {
+            list_prepend(list, data);
         }
-
-        temp = temp->next;
     }
+
     return NULL;
 }
 
@@ -204,22 +138,25 @@ void hash_update(lhash *hash, key_t k, val_t v) {
 
     int index = hash->hash_fn(k) % hash->capacity;
 
-    lchain *temp = hash->table[index];
-    while (temp != NULL) {
-        if (hash->equiv_fn(temp->k, k)) {
+    linked_list_t list = hash->table[index];
+    dbg_assert(list != NULL);
 
-            if (hash->table[index] != temp) {
-                // should improve temporal locality
-                chain_pop(temp);
-                chain_insert(hash->table[index], temp);
-                hash->table[index] = temp;
-            }
-            temp->v = v;
+    size_t len = list_getlen(list);
+
+    for (size_t i = 0; i < len; i++) {
+        data_t data = list_pop(list);
+        list_prepend(list, data);
+
+        data_t* kv_pair = (data_t*)data;
+        key_t _k = (key_t)(kv_pair[0]);
+        val_t _v = (val_t)(kv_pair[1]);
+
+        if (hash->equiv_fn(_k, k)) {
+            kv_pair[1] = (data_t)v;
             return;
         }
-
-        temp = temp->next;
     }
+
     return;
 }
 
@@ -234,21 +171,24 @@ val_t hash_search(lhash *hash, key_t k) {
 
     int index = hash->hash_fn(k) % hash->capacity;
 
-    lchain *temp = hash->table[index];
-    while (temp != NULL) {
-        if (hash->equiv_fn(temp->k, k)) {
+    linked_list_t list = hash->table[index];
+    dbg_assert(list != NULL);
 
-            if (hash->table[index] != temp) {
-                // should improve temporal locality
-                chain_pop(temp);
-                chain_insert(hash->table[index], temp);
-                hash->table[index] = temp;
-            }
-            return temp->v;
+    size_t len = list_getlen(list);
+
+    for (size_t i = 0; i < len; i++) {
+        data_t data = list_pop(list);
+
+        data_t* kv_pair = (data_t*)data;
+        key_t _k = (key_t)(kv_pair[0]);
+        val_t _v = (val_t)(kv_pair[1]);
+        list_prepend(list, data);
+
+        if (hash->equiv_fn(_k, k)) {
+            return _v;
         }
-
-        temp = temp->next;
     }
+
     return NULL;
 }
 
@@ -262,12 +202,18 @@ void hash_print(lhash *hash) {
     for (int i = 0; i < hash->capacity; i++) {
         printf("|[%d]:\033[0m", i);
 
-        lchain *temp = hash->table[i];
-        while (temp != NULL) {
-            printf(" ");
-            hash->print_fn(temp->k, temp->v);
+        linked_list_t list = hash->table[i];
+        if (list == NULL) { continue; }
 
-            temp = temp->next;
+        size_t len = list_getlen(list);
+
+        for (size_t i = 0; i < len; i++) {
+            data_t data = list_pop(list);
+            list_prepend(list, data);
+
+            data_t* kv_pair = (data_t*)data;
+            printf(" ");
+            hash->print_fn((key_t)(kv_pair[0]), (val_t)(kv_pair[1]));
         }
         printf("\n");
     }
@@ -279,21 +225,23 @@ void hash_print(lhash *hash) {
  * @param hash
  * @return void
  */
-void hash_free(lhash *hash) {
+void hash_destroy(lhash *hash) {
     dbg_assert(hash != NULL);
 
     for (int i = 0; i < hash->capacity; i++) {
-        lchain *temp = hash->table[i];
-        while (temp != NULL) {
-            chain_pop(temp);
-            hash->table[i] = temp->next;
+        linked_list_t list = hash->table[i];
+        if (list == NULL) { continue; }
 
-            temp->prev = NULL;
-            temp->next = NULL;
+        size_t len = list_getlen(list);
 
-            chain_free(temp);
-            temp = hash->table[i];
+        for (size_t i = 0; i < len; i++) {
+            data_t data = list_pop(list);
+
+            data_t* kv_pair = (data_t*)data;
+            free(kv_pair);
         }
+
+        list_destroy(list);
     }
 
     free(hash);
