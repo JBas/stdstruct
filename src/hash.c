@@ -11,35 +11,23 @@
 
 #include <stdlib.h>
 #include "hash.h"
+#include "llist.h"
 #include "debug.h"
-
-struct lib_chain {
-    key_t k;                /**< Key for this chain */
-    val_t v;                /**< Value for the chain */
-    struct lib_chain *prev; /**< Previous chain */
-    struct lib_chain *next; /**< Next chain */
-};
-typedef struct lib_chain lchain;
 
 struct lib_hash {
     int size;
     int capacity;
-    lchain **table;
+    linked_list_t* table;
     key_equiv_fn_t equiv_fn;
     key_hash_fn_t hash_fn;
     item_print_fn_t print_fn;
 };
 typedef struct lib_hash lhash;
 
-lchain *chain_new(key_t k, val_t v);
-void chain_insert(lchain *base, lchain *chain);
-lchain *chain_pop(lchain *chain);
-void chain_free(lchain *chain);
-
 /*---------------------------------------------------------------------------*/
 
 /**
- * chain constructor function
+ * @brief chain constructor function.
  * @param k
  * @param v
  * @return chain, a dynamically allocated lchain pointer
@@ -55,20 +43,31 @@ lchain *chain_new(key_t k, val_t v) {
     return chain;
 }
 
+/**
+ * @brief chain insertion function.
+ * @param base
+ * @param chain
+ * @return void
+ */
 void chain_insert(lchain *base, lchain *chain) {
     dbg_assert(base != NULL);
     dbg_assert(base->prev == NULL);
     dbg_assert(chain != NULL);
-    
+
     base->prev = chain;
     chain->next = base;
     chain->prev = NULL;
     return;
 }
 
+/**
+ * @brief chain pop function.
+ * @param chain
+ * @return chain
+ */
 lchain *chain_pop(lchain *chain) {
     dbg_assert(chain != NULL);
-    
+
     if (chain->prev != NULL) {
         lchain *prev = chain->prev;
         lchain *next = chain->next;
@@ -84,6 +83,11 @@ lchain *chain_pop(lchain *chain) {
     return chain;
 }
 
+/**
+ * @brief chain free function.
+ * @param chain
+ * @return void
+ */
 void chain_free(lchain *chain) {
     // does not free any of chain members,
     // because they can still be referenced
@@ -95,6 +99,14 @@ void chain_free(lchain *chain) {
 
 /*---------------------------------------------------------------------------*/
 
+/**
+ * @brief hash table allocation function.
+ * @param capacity
+ * @param equiv_fn
+ * @param hash_fn
+ * @param print_fn
+ * @return hash
+ */
 lhash *hash_new(int capacity,
                 key_equiv_fn_t equiv_fn,
                 key_hash_fn_t hash_fn,
@@ -123,6 +135,13 @@ lhash *hash_new(int capacity,
     return hash;
 }
 
+/**
+ * @brief hash table insertion function.
+ * @param hash
+ * @param k
+ * @param v
+ * @return void
+ */
 void hash_insert(lhash *hash, key_t k, val_t v) {
     dbg_assert(hash != NULL);
 
@@ -130,7 +149,7 @@ void hash_insert(lhash *hash, key_t k, val_t v) {
     hash->size++;
 
     int index = hash->hash_fn(chain->k) % hash->capacity;
-    
+
     if (hash->table[index] == NULL) {
         hash->table[index] = chain;
         return;
@@ -140,6 +159,12 @@ void hash_insert(lhash *hash, key_t k, val_t v) {
     hash->table[index] = chain;
 }
 
+/**
+ * @brief hash table removal function.
+ * @param hash
+ * @param k
+ * @return v
+ */
 val_t hash_remove(hash_t hash, key_t k) {
     dbg_assert(hash != NULL);
 
@@ -150,7 +175,7 @@ val_t hash_remove(hash_t hash, key_t k) {
         if (hash->equiv_fn(temp->k, k)) {
             val_t v = temp->v;
             chain_pop(temp);
-            
+
             if (hash->table[index] == temp) {
                 hash->table[index] = temp->next;
             }
@@ -167,6 +192,13 @@ val_t hash_remove(hash_t hash, key_t k) {
     return NULL;
 }
 
+/**
+ * @brief hash table update function.
+ * @param hash
+ * @param k
+ * @param v
+ * @return void
+ */
 void hash_update(lhash *hash, key_t k, val_t v) {
     dbg_assert(hash != NULL);
 
@@ -191,6 +223,12 @@ void hash_update(lhash *hash, key_t k, val_t v) {
     return;
 }
 
+/**
+ * @brief hash table search function.
+ * @param hash
+ * @param k
+ * @return v
+ */
 val_t hash_search(lhash *hash, key_t k) {
     dbg_assert(hash != NULL);
 
@@ -214,6 +252,11 @@ val_t hash_search(lhash *hash, key_t k) {
     return NULL;
 }
 
+/**
+ * @brief hash table print function.
+ * @param hash
+ * @return void
+ */
 void hash_print(lhash *hash) {
     printf("\033[1m\033[31m|-------------------------------\n");
     for (int i = 0; i < hash->capacity; i++) {
@@ -223,7 +266,7 @@ void hash_print(lhash *hash) {
         while (temp != NULL) {
             printf(" ");
             hash->print_fn(temp->k, temp->v);
-            
+
             temp = temp->next;
         }
         printf("\n");
@@ -231,9 +274,14 @@ void hash_print(lhash *hash) {
     printf("\033[1m\033[31m|-------------------------------\n\033[0m");
 }
 
+/**
+ * @brief hash table free function.
+ * @param hash
+ * @return void
+ */
 void hash_free(lhash *hash) {
     dbg_assert(hash != NULL);
-    
+
     for (int i = 0; i < hash->capacity; i++) {
         lchain *temp = hash->table[i];
         while (temp != NULL) {

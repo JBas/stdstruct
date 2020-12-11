@@ -1,3 +1,14 @@
+/** @file hash.h
+ *  @brief A simple hash dictionary header file
+ *
+ *  This is the header file for a
+ *  simple hash dictionary.
+ *
+ *  @author Joshua Bas (jnbas)
+ *  @date March 16, 2020
+ *  @bug No know bugs.
+ */
+
 #ifndef _HASH_H_
 #define _HASH_H_
 
