@@ -25,15 +25,18 @@ typedef struct lib_linked_list {
     struct lib_node* end;
 
     data_print_fn_t print_fn;
+    data_free_fn_t data_free_fn;
 } llist;
 
-llist* list_create(data_t data, data_print_fn_t print_fn) {
+llist* list_create(data_t data, data_print_fn_t print_fn, data_free_fn_t data_free_fn) {
     dbg_assert(print_fn != NULL);
+    dbg_assert(data_free_fn != NULL);
 
     llist* list = (llist *)malloc(sizeof(llist));
     dbg_assert(list != NULL);
 
     list->print_fn = print_fn;
+    list->data_free_fn = data_free_fn;
     list->start = (lnode *)malloc(sizeof(lnode));
     dbg_assert(list->start != NULL);
 
@@ -84,11 +87,17 @@ void list_append(llist* list, data_t data) {
 data_t list_pop(llist* list) {
     dbg_assert(list != NULL);
 
+    if (list_isempty(list)) {
+        return NULL;
+    }
+
     lnode* temp = list->end;
     list->end = temp->prev;
 
-    temp->prev->next = NULL;
-    temp->prev = NULL;
+    if (temp->prev != NULL) {
+        temp->prev->next = NULL;
+        temp->prev = NULL;
+    }
 
     data_t data = temp->data;
     free(temp);
@@ -133,6 +142,8 @@ void list_destroy(llist* list) {
     while (temp != NULL) {
         lnode* prev = temp;
         temp = temp->next;
+
+        list->data_free_fn(prev->data);
         free(prev);
     }
 

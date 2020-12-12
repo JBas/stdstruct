@@ -15,6 +15,9 @@ int main() {
     list_append(list, (data_t)'a');
     list_append(list, (data_t)'s');
     list_prepend(list, (data_t)'@');
+    list_prepend(list, (data_t)'*');
+    list_prepend(list, (data_t)'\\');
+    list_prepend(list, (data_t)'w');
 
     list_print(list);
 
