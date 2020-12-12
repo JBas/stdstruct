@@ -25,7 +25,7 @@ int main() {
     hash_t hash = hash_create(TABLE_SIZE, &equiv_fn, &hash_fn, &print_fn);
 
     for (char i = 0; i < 26; i++) {
-        hash_insert(hash, (key_t)('a'+i), (val_t)((i+13)*100 % 14));
+        hash_insert(hash, (key_t)(long)('a'+i), (val_t)(long)((i+13)*100 % 14));
     }
     hash_print(hash);
 

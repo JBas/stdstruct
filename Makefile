@@ -1,5 +1,5 @@
 CC=gcc
-FLAGS=-Wall -Wextra -Werror -Wshadow -std=c89 -pedantic
+CFLAGS=-Wall -Wextra -Werror -Wshadow -std=c99 -pedantic
 
 HASH = hash
 LLIST = llist

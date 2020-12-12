@@ -62,7 +62,7 @@ lhash* hash_create(size_t capacity,
     return hash;
 }
 
-void print_pass(data_t data) { return; }
+void print_pass(data_t data) { (void)data; return; }
 void free_fn(data_t data) {
     data_t* kv_pair = (data_t *)data;
     free(kv_pair);
@@ -159,7 +159,6 @@ void hash_update(lhash* hash, key_t k, val_t v) {
         dbg_assert(kv_pair != NULL);
 
         key_t _k = (key_t)(kv_pair[0]);
-        val_t _v = (val_t)(kv_pair[1]);
 
         if (hash->equiv_fn(_k, k)) {
             kv_pair[1] = (data_t)v;
@@ -225,7 +224,7 @@ void hash_print(lhash* hash) {
 
         size_t len = list_getlen(list);
 
-        for (size_t i = 0; i < len; i++) {
+        for (size_t j = 0; j < len; j++) {
             data_t data = list_pop(list);
             list_prepend(list, data);
 
