@@ -25,27 +25,22 @@ typedef struct lib_linked_list {
     struct lib_node* end;
 
     data_print_fn_t print_fn;
-    data_free_fn_t data_free_fn;
+    data_free_fn_t free_fn;
 } llist;
 
-llist* list_create(data_t data, data_print_fn_t print_fn, data_free_fn_t data_free_fn) {
-    dbg_assert(print_fn != NULL);
-    dbg_assert(data_free_fn != NULL);
+/*---------------------------------------------------------------------------*/
+
+llist* list_create(data_print_fn_t print_fn, data_free_fn_t free_fn) {
+    dbg_assert(free_fn != NULL);
 
     llist* list = (llist *)malloc(sizeof(llist));
     dbg_assert(list != NULL);
 
     list->print_fn = print_fn;
-    list->data_free_fn = data_free_fn;
-    list->start = (lnode *)malloc(sizeof(lnode));
-    dbg_assert(list->start != NULL);
-
-    list->start->data = data;
-    list->start->prev = NULL;
-    list->start->next = NULL;
-
-    list->end = list->start;
-    list->len = 1;
+    list->free_fn = free_fn;
+    list->start = NULL;
+    list->end = NULL;
+    list->len = 0;
     return list;
 }
 
@@ -56,6 +51,14 @@ void list_prepend(llist* list, data_t data) {
     dbg_assert(temp != NULL);
 
     temp->data = data;
+    if (list_isempty(list)) {
+        temp->prev = NULL;
+        temp->next = NULL;
+        list->start = temp;
+        list->end = temp;
+        return;
+    }
+
     temp->prev = NULL;
     temp->next = list->start;
 
@@ -73,6 +76,14 @@ void list_append(llist* list, data_t data) {
     dbg_assert(temp != NULL);
 
     temp->data = data;
+    if (list_isempty(list)) {
+        temp->prev = NULL;
+        temp->next = NULL;
+        list->start = temp;
+        list->end = temp;
+        return;
+    }
+
     temp->prev = list->end;
     temp->next = NULL;
 
@@ -88,7 +99,7 @@ data_t list_pop(llist* list) {
     dbg_assert(list != NULL);
 
     if (list_isempty(list)) {
-        return NULL;
+        return (data_t)NULL;
     }
 
     lnode* temp = list->end;
@@ -107,11 +118,59 @@ data_t list_pop(llist* list) {
     return data;
 }
 
+data_t list_peek_start(linked_list_t list) {
+    dbg_assert(list != NULL);
+
+    if (list_isempty(list)) {
+        return (data_t)NULL;
+    }
+
+    lnode* temp = list->start;
+    dbg_assert(temp != NULL);
+
+    return temp->data;
+}
+
+data_t list_peek_end(linked_list_t list) {
+    dbg_assert(list != NULL);
+
+    if (list_isempty(list)) {
+        return (data_t)NULL;
+    }
+
+    lnode* temp = list->end;
+    dbg_assert(temp != NULL);
+
+    return temp->data;
+}
+
+void list_cycle(linked_list_t list) {
+    dbg_assert(list != NULL);
+
+    if (list_isempty(list)) {
+        return;
+    }
+
+    lnode* temp = list->end;
+
+    list->end = temp->prev;
+    temp->prev->next = NULL;
+    temp->prev = NULL;
+
+    temp->next = list->start;
+    list->start->prev = temp;
+    list->start = temp;
+
+    return;
+}
+
 void list_print(linked_list_t list) {
     dbg_assert(list != NULL);
 
     data_print_fn_t print_fn = list->print_fn;
-    dbg_assert(print_fn != NULL);
+    if (print_fn == NULL) {
+        return;
+    }
 
     for (lnode* temp = list->start; temp != NULL; temp = temp->next) {
         print_fn(temp->data);
@@ -143,7 +202,7 @@ void list_destroy(llist* list) {
         lnode* prev = temp;
         temp = temp->next;
 
-        list->data_free_fn(prev->data);
+        list->free_fn(prev->data);
         free(prev);
     }
 

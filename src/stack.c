@@ -3,19 +3,21 @@
 #include <stdio.h>
 #include "stack.h"
 
-typedef struct node lnode;
-struct node {
+typedef struct lib_node lnode;
+struct lib_node {
     elem_t data;
     lnode* prev;
     lnode* next;
 };
 
-typedef struct stack lstack;
-struct stack {
+typedef struct lib_stack lstack;
+struct lib_stack {
     size_t size;
     lnode* start;
     lnode* end;
 };
+
+/*---------------------------------------------------------------------------*/
 
 lstack* stack_create() {
     dbg_printf("Creating Stack!\n");

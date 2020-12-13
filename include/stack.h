@@ -4,7 +4,7 @@
 #define _STACK_H_
 
 typedef void* elem_t;
-typedef struct stack* stacked_t;
+typedef struct lib_stack* stacked_t;
 
 stacked_t stack_create();
 int stack_isempty(stacked_t stack);

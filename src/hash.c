@@ -27,6 +27,15 @@ struct lib_hash {
 
 /*---------------------------------------------------------------------------*/
 
+void data_print_fn(data_t data) { (void)data; return; }
+
+// @TODO: need to free keys and values!
+void data_free_fn(data_t data) {
+    data_t* kv_pair = (data_t *)data;
+    free(kv_pair);
+    return;
+}
+
 /**
  * @brief hash table allocation function.
  * @param capacity
@@ -41,7 +50,6 @@ lhash* hash_create(size_t capacity,
                    item_print_fn_t print_fn) {
     dbg_assert(equiv_fn != NULL);
     dbg_assert(hash_fn != NULL);
-    dbg_assert(print_fn != NULL);
 
     lhash* hash = (lhash *)malloc(sizeof(lhash));
     linked_list_t* table = (linked_list_t *)malloc(capacity*sizeof(linked_list_t));
@@ -54,19 +62,12 @@ lhash* hash_create(size_t capacity,
     hash->print_fn = print_fn;
 
     for (size_t i = 0; i < capacity; i++) {
-        hash->table[i] = NULL;
+        hash->table[i] = list_create(&data_print_fn, &data_free_fn);
     }
 
     dbg_assert(hash != NULL);
     dbg_assert(hash->table != NULL);
     return hash;
-}
-
-void print_pass(data_t data) { (void)data; return; }
-void free_fn(data_t data) {
-    data_t* kv_pair = (data_t *)data;
-    free(kv_pair);
-    return;
 }
 
 /**
@@ -89,10 +90,7 @@ void hash_insert(lhash* hash, key_t k, val_t v) {
     size_t index = hash->hash_fn(k) % hash->capacity;
 
     dbg_assert(hash->table != NULL);
-    if (hash->table[index] == NULL) {
-        hash->table[index] = list_create((data_t)kv_pair, &print_pass, &free_fn);
-        return;
-    }
+    dbg_assert(hash->table[index] != NULL);
     list_append(hash->table[index], (data_t)kv_pair);
     return;
 }
@@ -115,7 +113,7 @@ val_t hash_remove(lhash* hash, key_t k) {
     size_t len = list_getlen(list);
 
     for (size_t i = 0; i < len; i++) {
-        data_t data = list_pop(list);
+        data_t data = list_peek_end(list);
 
         data_t* kv_pair = (data_t *)data;
         dbg_assert(kv_pair != NULL);
@@ -124,11 +122,10 @@ val_t hash_remove(lhash* hash, key_t k) {
         val_t _v = (val_t)(kv_pair[1]);
 
         if (hash->equiv_fn(_k, k)) {
-            free_fn(data);
+            list_pop(list);
+            data_free_fn(data);
             hash->size--;
             return _v;
-        } else {
-            list_prepend(list, data);
         }
     }
     return NULL;
@@ -153,20 +150,22 @@ void hash_update(lhash* hash, key_t k, val_t v) {
     size_t len = list_getlen(list);
 
     for (size_t i = 0; i < len; i++) {
-        data_t data = list_pop(list);
+        data_t data = list_peek_end(list);
 
-        data_t* kv_pair = (data_t*)data;
+        data_t* kv_pair = (data_t *)data;
         dbg_assert(kv_pair != NULL);
 
         key_t _k = (key_t)(kv_pair[0]);
 
         if (hash->equiv_fn(_k, k)) {
             kv_pair[1] = (data_t)v;
+            list_pop(list);
             list_prepend(list, data);
             return;
         }
-        list_prepend(list, data);
     }
+
+    hash_insert(hash, k, v);
 
     return;
 }
@@ -189,18 +188,19 @@ val_t hash_search(lhash* hash, key_t k) {
     size_t len = list_getlen(list);
 
     for (size_t i = 0; i < len; i++) {
-        data_t data = list_pop(list);
+        data_t data = list_peek_end(list);
 
         data_t* kv_pair = (data_t*)data;
         dbg_assert(kv_pair != NULL);
 
         key_t _k = (key_t)(kv_pair[0]);
         val_t _v = (val_t)(kv_pair[1]);
-        list_prepend(list, data);
 
         if (hash->equiv_fn(_k, k)) {
             return _v;
         }
+
+        list_cycle(list);
     }
 
     return NULL;
@@ -214,25 +214,28 @@ val_t hash_search(lhash* hash, key_t k) {
 void hash_print(lhash* hash) {
     dbg_assert(hash != NULL);
 
+    if (hash->print_fn == NULL) { return; }
+
     printf("|-------------------------------\n");
     for (size_t i = 0; i < hash->capacity; i++) {
         printf("|[%zu]:", i);
 
         dbg_assert(hash->table != NULL);
         linked_list_t list = hash->table[i];
-        if (list == NULL) { printf("\n"); continue; }
+        dbg_assert(list != NULL);
 
         size_t len = list_getlen(list);
 
         for (size_t j = 0; j < len; j++) {
-            data_t data = list_pop(list);
-            list_prepend(list, data);
+            data_t data = list_peek_end(list);
 
             data_t* kv_pair = (data_t*)data;
             dbg_assert(kv_pair != NULL);
 
             printf(" ");
             hash->print_fn((key_t)(kv_pair[0]), (val_t)(kv_pair[1]));
+
+            list_cycle(list);
         }
         printf("\n");
     }
